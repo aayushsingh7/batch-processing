@@ -5,15 +5,17 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev":"nodemon src/server.js",
-    "start":"node src/server.js"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bullmq": "^5.66.3",
     "express": "^5.2.1",
+    "ioredis": "^5.8.2",
     "mysql2": "^3.16.0",
     "sequelize": "^6.37.7"
   }

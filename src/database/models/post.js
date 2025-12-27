@@ -1,5 +1,5 @@
 import { DataTypes, Sequelize } from "sequelize";
-import sequelize from "../connection.js";
+import sequelize from "../../config/mysql.js";
 
 const Post = sequelize.define(
   "post",

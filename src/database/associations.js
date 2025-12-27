@@ -1,4 +1,4 @@
-import sequelize from "./connection.js";
+import sequelize from "../config/mysql.js";
 import Like from "./models/like.js";
 import Post from "./models/post.js";
 import User from "./models/user.js";
