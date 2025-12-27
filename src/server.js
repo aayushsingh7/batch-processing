@@ -2,7 +2,7 @@ import express from "express";
 import { Like, Post, User } from "./database/associations.js";
 import sequelize from "./config/mysql.js";
 import redis from "./config/redis.js";
-import myQueue from "./queues/trailQueue.js";
+import likeQueue from "./queues/likeQueue.js";
 const app = express();
 
 app.use(express.json());
@@ -113,7 +113,7 @@ app.post("/api/posts/:id/likes", async (req, res) => {
     await redis.sadd(key, user_id);
 
     if ((await redis.scard(key)) > 100) {
-      await myQueue.add(
+      await likeQueue.add(
         "bulk-likes",
         { post_id: id },
         {

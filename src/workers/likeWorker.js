@@ -1,12 +1,12 @@
 import { Worker } from "bullmq";
 import redis from "../config/redis.js";
 import { Like, Post } from "../database/associations.js";
-import myQueue from "../queues/trailQueue.js";
+import likeQueue from "../queues/likeQueue.js";
 import { Op } from "sequelize";
 import sequelize from "../config/mysql.js";
 
 const worker = new Worker(
-  "foo",
+  "like-processing",
   async (job) => {
     if (job.name == "bulk-likes") {
       const { post_id } = job.data;
@@ -83,7 +83,7 @@ const worker = new Worker(
        opts: { jobId: `bulk:${id}`, attempts: 3, backoff: { type: "exponential", delay: 5000 }, },
       }));
 
-      await myQueue.addBulk(jobs);
+      await likeQueue.addBulk(jobs);
       await redis.del("post_with_pending_likes");
     }
   },

@@ -1,6 +1,5 @@
 import Redis from 'ioredis';
 
-// Initializing the client automatically starts the connection
 const redis = new Redis({
   host: '127.0.0.1', 
   port: 6379,      
