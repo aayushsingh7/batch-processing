@@ -4,6 +4,7 @@ import { Like, Post } from "../database/associations.js";
 import likeQueue from "../queues/likeQueue.js";
 import { Op } from "sequelize";
 import sequelize from "../config/mysql.js";
+import chunkArray from "../utils/chunkArray.js";
 
 const worker = new Worker(
   "like-processing",
@@ -25,25 +26,27 @@ const worker = new Worker(
         if (hasLikes) await redis.rename(likeKey, pLikeKey);
         if (hasDislikes) await redis.rename(dislikeKey, pDislikeKey);
 
-        const likedBy = hasLikes ? await redis.smembers(pLikeKey) : [];
-        const dislikedBy = hasDislikes ? await redis.smembers(pDislikeKey) : [];
-
-        const conflictIds = likedBy.filter((id) => dislikedBy.includes(id));
-        const finalLikes = likedBy.filter((id) => !conflictIds.includes(id));
-        const finalDislikes = dislikedBy.filter( (id) => !conflictIds.includes(id) );
+        const finalLikes = await redis.sdiff(pLikeKey, pDislikeKey);
+        const finalDislikes = await redis.sdiff(pDislikeKey, pLikeKey);
 
         if (finalDislikes.length > 0) {
-          await Like.destroy({
-            where: { post_id, user_id: { [Op.in]: finalDislikes } },
-            transaction: t,
-          });
+          const dislikeChunk = chunkArray(finalDislikes, 1000);
+          for (let batch of dislikeChunk) {
+            await Like.destroy({
+              where: { post_id, user_id: { [Op.in]: batch } },
+              transaction: t,
+            });
+          }
         }
 
         if (finalLikes.length > 0) {
-          await Like.bulkCreate(
-            finalLikes.map((u_id) => ({ post_id, user_id: u_id })),
-            { ignoreDuplicates: true, transaction: t }
-          );
+          const likeChunk = chunkArray(finalLikes, 1000);
+          for (let batch of likeChunk) {
+            await Like.bulkCreate(
+              batch.map((u_id) => ({ post_id, user_id: u_id })),
+              { ignoreDuplicates: true, transaction: t }
+            );
+          }
         }
 
         const netChange = finalLikes.length - finalDislikes.length;
@@ -70,7 +73,9 @@ const worker = new Worker(
           await redis.sunionstore(dislikeKey, dislikeKey, pDislikeKey);
           await redis.del(pDislikeKey);
         }
-        console.error( `Job ${job.id} failed. Data restored to Redis for retry.` );
+        console.error(
+          `Job ${job.id} failed. Data restored to Redis for retry.`
+        );
         throw error;
       }
     }
@@ -80,7 +85,12 @@ const worker = new Worker(
       const jobs = postIds.map((id) => ({
         name: "bulk-likes",
         data: { post_id: id },
-       opts: { jobId: `bulk:${id}`, attempts: 3, backoff: { type: "exponential", delay: 5000 }, },
+        opts: {
+          jobId: `bulk:${id}`,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+          removeOnComplete: true,
+        },
       }));
 
       await likeQueue.addBulk(jobs);

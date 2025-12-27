@@ -123,6 +123,7 @@ app.post("/api/posts/:id/likes", async (req, res) => {
             type: "exponential", 
             delay: 5000, 
           },
+          removeOnComplete:true
         }
       );
     }
